@@ -653,7 +653,8 @@ pickBtn.addEventListener('click',()=>{
   }
   document.body.classList.toggle('picking',picking);
   pickBtn.classList.toggle('armed',picking);
-  pickBtn.textContent = picking ? 'Terminer la sélection' : 'Sélection manuelle';
+  /* libellé traduit : clé + défaut posés à chaque bascule, pour que applyStaticI18N le suive aussi au changement de langue */
+  { const k=picking?'tool.pickdone':'tool.pick', df=picking?'Terminer la sélection':'Sélection manuelle'; pickBtn.dataset.i18n=k; pickBtn.dataset.i18nDefault=df; pickBtn.textContent=UI(k,df); }
   allOn.hidden = allOff.hidden = !picking;
   syncOffBadge();
 });
@@ -678,7 +679,6 @@ allOff.addEventListener('click',()=>setAll(false));
 const clearOff=document.getElementById('clearoff');
 function syncOffBadge(){
   clearOff.hidden = picking || off.size===0;
-  clearOff.textContent = 'Réinitialiser la sélection';
   // la coche des retenus ne s'affiche que si une sélection est effectivement en cours
   document.body.classList.toggle('has-selection', !picking && off.size>0);
 }
@@ -924,7 +924,7 @@ const STR={
     chip3:'How does Stun work?',
     astop:'Stop', aclear:'Clear',
     'tab.heroes':'Heroes','tab.toks':'Tokens','tab.ach':'Achievements','tab.boss':'Boss',
-    'tool.pick':'Manual selection','tool.allon':'Check all','tool.alloff':'Uncheck all',
+    'tool.pick':'Manual selection','tool.pickdone':'Finish selection','tool.allon':'Check all','tool.alloff':'Uncheck all',
     'tool.clearoff':'Reset selection','tool.openrnd':'Random draw',
     reset:'Show all',
     'empty.heroes':'No heroes at these levels.',
@@ -4864,10 +4864,13 @@ async function dtaExport(editable){
 
 /* ----- ouverture / fermeture ----- */
 function dtaFit(){
-  if(!dtaBuilt) return; const w=dtaEl.clientWidth, sc0=Math.max(.45,Math.min(1.6,(w-20)/1210)), cap=ptCap(1210,935,sc0), z=Math.max(1,Math.min(dtaR.z||1,cap/sc0)), sc=sc0*z; dtaR.z=z; dtaR.sc0=sc0; dtaR.cap=cap;
+  if(!dtaBuilt) return; const w=dtaEl.clientWidth, sc0=Math.max(.45,Math.min(1.6,(w-20)/1210)), cap=ptCap(1210,935,sc0), z=Math.max(1,Math.min(dtaR.z||1,cap/sc0)), sc=sc0*z; dtaR.z=z; dtaR.sc0=sc0; dtaR.cap=cap; dtaEl.classList.toggle('dz',ptHeavy(1210,935,sc0,z));
   { const zb=document.getElementById('dtazoom'); if(zb){ zb.hidden=cap/sc0<1.06; zb.querySelector('.zf').textContent=(Math.round(z*10)/10)+'×'; } }
   dtaR.fit.style.width=Math.round(1210*sc)+'px'; dtaR.fit.style.height=Math.round(935*sc+16)+'px'; dtaR.sheet.style.transform='scale('+sc+')'; dtaR.scale=sc;
 }
+/* hauteur réelle de la barre du haut (1 ou 2 rangées selon l'écran/la langue) → marge haute de la feuille */
+{ const tb=dtaEl.querySelector('.dta-top'), upd=()=>{ dtaEl.style.setProperty('--dtatop',Math.max(0,tb.offsetHeight-14)+'px'); };
+  if(window.ResizeObserver) new ResizeObserver(upd).observe(tb); window.addEventListener('resize',upd); upd(); }
 function dtaSel(on){ tabs.querySelectorAll('[role=tab]').forEach(b=>b.setAttribute('aria-selected',on?(b.dataset.pane==='dta'?'true':'false'):(b.dataset.pane===dtaPrev?'true':'false'))); }
 function openDTA(){
   if(dtaOpenF) return; dtaOpenF=true;
@@ -4983,7 +4986,7 @@ const DTM_D={
 function dtmT(k){ const a=DTM_D[k]; if(!a) return k; return LANG==='fr'?a[1]:(LANG==='en'?a[2]:a[0]); }
 const dtmEl=document.getElementById('dtm'), dmFit=document.getElementById('dmfit'), dmTabs=document.getElementById('dmtabs'), dmTop=dtmEl.querySelector('.dtm-top'); const dmStage=document.getElementById('dmstage'), dmZoomBox=document.getElementById('dmzoom');
 const dtmR={sheets:{},open:false,prev:'heroes',sc:1,z:1,hinted:false};
-{ const st=dtmEl.style; st.setProperty('--p2','url("'+DTM_A.p2+'")'); st.setProperty('--m1','url("'+DTM_A.m1+'")'); st.setProperty('--m2','url("'+DTM_A.m2+'")'); st.setProperty('--mc','url("'+DTM_A.mc+'")'); }
+/* les images du sheet (p2, masques m1/m2/mc) sont référencées en dur dans le CSS : un url() base64 dans une variable CSS était re-parsé pour chaque élément (style recalc ≈ 1 ms/élément) */
 
 /* ----- état ----- */
 function dtmNew(){ return {id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),pn:'',side:0,c:{},tk:[0,0,0,0,0],ng:[0,0,0,0,0],m:new Array(20).fill(0)}; }
@@ -5246,7 +5249,7 @@ function dtmGeo(){
 }
 function dtmFit(){
   if(!dtmR.open&&!dtmEl.classList.contains('on')) return;
-  const g=dtmGeo(); dtmR.z=g.z; dtmR.sc=g.sc;
+  const g=dtmGeo(); dtmR.z=g.z; dtmR.sc=g.sc; dtmEl.classList.toggle('dz',ptHeavy(1650,1200,g.sc0,g.z));
   dmFit.style.cssText='position:absolute;left:'+g.L+'px;top:'+g.top+'px;width:'+g.W+'px;height:'+g.H+'px;';
   Object.keys(dtmR.sheets).forEach(id=>{ dtmR.sheets[id].root.style.transform='scale('+g.sc+')'; });
   dmZoomBox.hidden=g.cap/g.sc0<1.06; dmZoomBox.querySelector('.zf').textContent=(Math.round(g.z*10)/10)+'×';
@@ -5381,7 +5384,11 @@ document.addEventListener('keydown',e=>{
 
 /* ----- zoom intégré (DTM + DTA) : le pinch natif du navigateur est bloqué (il faisait crasher l'app mobile : surfaces énormes),
    le zoom se fait ici, par un facteur plafonné en pixels réels ----- */
-function ptCap(w,h,base){ const dpr=window.devicePixelRatio||1; return Math.max(base, Math.sqrt(7e6/(w*h))/dpr); }
+/* plafond d'échelle : au moins ×3 par rapport à l'ajustement (demande utilisateur), davantage si le budget de ~7 Mpx réels le permet ;
+   au-delà du budget « confortable » on passe en mode léger (.dz : pas d'animations/filtres/ombres) pour ménager la mémoire graphique */
+function ptBudget(w,h){ return Math.sqrt(7e6/(w*h))/(window.devicePixelRatio||1); }
+function ptCap(w,h,base){ return Math.max(base*3, ptBudget(w,h)); }
+function ptHeavy(w,h,sc0,z){ return sc0*z>ptBudget(w,h)*1.001; }
 function ptPinch(root,api){
   let g=null, raf=0, last=null;
   const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY)||1;

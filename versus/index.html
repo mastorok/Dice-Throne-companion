@@ -2495,7 +2495,7 @@ const Net=(function(){
 })();
 
 /* ================= démarrage ================= */
-{ const cf=window.DTVS_CFG||{}; if(cf.mainUrl){ const bl=$('#backlink'); if(bl){ bl.href=cf.mainUrl; } } }
+{ const cf=window.DTVS_CFG||{}; if(cf.mainUrl){ const bl=$('#backlink'); if(bl){ bl.href=cf.mainUrl; bl.removeAttribute('target'); bl.removeAttribute('rel'); } } }
 for(let i=0;i<6;i++) mkSeat(i);
 Store.onChange((keys)=>schedule(keys));
 Net.boot();
